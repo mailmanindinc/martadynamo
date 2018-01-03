@@ -6,35 +6,254 @@ Transform:
 Parameters:
   ProjectId:
     Type: String
-    Description: AWS CodeStar projectID used to associate new resources to team members
+    Description: Project to add Marta data to DynamoDB
 
 Resources:
-  GetHelloWorld:
+  MartaDataLoadFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: com.aws.codestar.projecttemplates.handler.HelloWorldHandler
+      Handler: org.marta.data.LoadMartaDataToDB
       Runtime: java8
       Role:
-        Fn::ImportValue:
-          !Join ['-', [!Ref 'ProjectId', !Ref 'AWS::Region', 'LambdaTrustRole']]
+        Fn::GetAtt:
+        - DynamoLambdaRole
+        - Arn 
+      Timeout: 300
+      MemorySize: 512 
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref FunctionSecurityGroupDynamoS3
+          - !Ref FunctionSecurityGroupDynamo
+        SubnetIds:
+          - !ImportValue "marta-private-subnet"   
+      Environment:
+        Variables:
+          ROUTE: !Ref ROUTETable
+          TRIP: !Ref TRIPTable
+          STOP: !Ref STOPTable
+          SCHEDULE: !Ref SCHEDULETable
       Events:
-        GetEvent:
-          Type: Api
+        Timer:
+          Type: S3
           Properties:
-            Path: /
-            Method: get
+            Bucket: !Ref MartaFilesBucket
+            Events: s3:ObjectCreated:*
 
-  PostHelloWorld:
-    Type: AWS::Serverless::Function
+  DynamoLambdaRole:
+    Type: AWS::IAM::Role
     Properties:
-      Handler: com.aws.codestar.projecttemplates.handler.HelloWorldHandler
-      Runtime: java8
-      Role:
-        Fn::ImportValue:
-          !Join ['-', [!Ref 'ProjectId', !Ref 'AWS::Region', 'LambdaTrustRole']]
-      Events:
-        PostEvent:
-          Type: Api
-          Properties:
-            Path: /
-            Method: post
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+            Effect: Allow
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+            Resource: 
+             - "*"
+          - Effect: Allow
+            Action:
+            - dynamodb:DeleteItem
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+            Resource: 
+             - "*"
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            Resource:
+             - "*"
+             
+  WriteScalingPolicy:
+    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+    Properties:
+      PolicyName: WriteAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 50.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          
+  WriteCapacityScalableTarget:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: 15
+      MinCapacity: 1
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref STOPTable
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: dynamodb:table:WriteCapacityUnits
+      ServiceNamespace: dynamodb
+
+  ScalingRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - application-autoscaling.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: "root"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "dynamodb:DescribeTable"
+                  - "dynamodb:UpdateTable"
+                  - "cloudwatch:PutMetricAlarm"
+                  - "cloudwatch:DescribeAlarms"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:SetAlarmState"
+                  - "cloudwatch:DeleteAlarms"
+                Resource: "*"
+                            
+  ROUTETable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: routeId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: routeId
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: '1'
+        WriteCapacityUnits: '1'
+      TableName: ROUTE
+
+  TRIPTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: tripId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: tripId
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: '1'
+        WriteCapacityUnits: '1'
+      TableName: TRIP
+
+  STOPTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: stopId
+        AttributeType: S
+      KeySchema:
+      - AttributeName: stopId
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: '1'
+        WriteCapacityUnits: '1'
+      TableName: STOP
+
+  SCHEDULETable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: tripId
+        AttributeType: S
+      - AttributeName: arrivalTime
+        AttributeType: S
+      KeySchema:
+      - AttributeName: tripId
+        KeyType: HASH
+      - AttributeName: arrivalTime
+        KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: '1'
+        WriteCapacityUnits: '1'
+      TableName: SCHEDULE
+  
+  FunctionSecurityGroupDynamo:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "marta - Lambda Function Dynamo Sec Group"
+      VpcId: !ImportValue "marta-vpc"
+
+  FunctionSecurityGroupDynamoS3:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "marta - Lambda Function S3 Sec Group"
+      VpcId: !ImportValue "marta-vpc"      
+
+  DynamoS3Endpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: "*"
+            Effect: "Allow"
+            Resource: "*"
+            Principal: "*"
+      RouteTableIds:
+        - !ImportValue "marta-private-routetable"
+      ServiceName: !Join 
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .s3
+      VpcId: !ImportValue "marta-vpc"
+
+  DynamoDBEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: "*"
+            Effect: "Allow"
+            Resource: "*"
+            Principal: "*"
+      RouteTableIds:
+        - !ImportValue "marta-private-routetable"
+      ServiceName: !Join 
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .dynamodb
+      VpcId: !ImportValue "marta-vpc"
+
+  MartaFilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+    DeletionPolicy: Retain
