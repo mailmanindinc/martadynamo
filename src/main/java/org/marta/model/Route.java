@@ -2,8 +2,10 @@ package org.marta.model;
 
 import java.io.Serializable;
 
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.univocity.parsers.annotations.Parsed;
 
+@DynamoDBTable(tableName = "ROUTE")
 public class Route implements Serializable {
 	
 	private static final long serialVersionUID = 70965951183782314L;

@@ -4,8 +4,10 @@ import java.io.Serializable;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBHashKey;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.univocity.parsers.annotations.Parsed;
 
+@DynamoDBTable(tableName = "STOP")
 public class Stop implements Serializable {
 
 	private static final long serialVersionUID = 3127359097645144549L;
