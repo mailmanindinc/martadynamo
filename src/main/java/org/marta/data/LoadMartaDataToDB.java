@@ -101,13 +101,11 @@ public class LoadMartaDataToDB implements RequestHandler<S3Event, String> {
 			parser.parse(br);
 
 			List<Stop> list = rowProcessor.getBeans();
-
 			System.out.println("Writing Stops to Dynamo :" + list.size());
 			for (Stop stop : list) {
-				System.out.println("Writing Stop record Dynamo :" + stop.getStopId());
 				stopRepository.save(stop);
 			}
-			
+			System.out.println("Completed Writing Stops to Dynamo :" + list.size());
 		} catch (Exception e) {
 			System.out.println("Unable to write to dynamo Exception: " + e);
 		}
@@ -128,7 +126,10 @@ public class LoadMartaDataToDB implements RequestHandler<S3Event, String> {
 
 			List<Trip> list = rowProcessor.getBeans();
 			System.out.println("Writing Trips to Dynamo :" + list.size());
-			tripRepository.saveOrUpdateTrips(list);
+			for (Trip trip : list) {
+				tripRepository.save(trip);
+			}
+			System.out.println("Completed Writing Trips to Dynamo :" + list.size());
 		} catch (Exception e) {
 			System.out.println("Exception: " + e);
 		}
@@ -148,7 +149,10 @@ public class LoadMartaDataToDB implements RequestHandler<S3Event, String> {
 
 			List<Route> list = rowProcessor.getBeans();
 			System.out.println("Writing Routes to Dynamo :" + list.size());
-			routeRepository.saveOrUpdateRoutes(list);
+			for (Route route : list) {
+				routeRepository.save(route);
+			}
+			System.out.println("Completed Writing Routes to Dynamo :" + list.size());
 		} catch (Exception e) {
 			System.out.println("Exception: " + e);
 		}
@@ -169,7 +173,10 @@ public class LoadMartaDataToDB implements RequestHandler<S3Event, String> {
 
 			List<Schedule> list = rowProcessor.getBeans();
 			System.out.println("Writing Schedules to Dynamo :" + list.size());
-			scehduleRepository.saveOrUpdateSchedules(list);
+			for (Schedule schedule : list) {
+				scehduleRepository.save(schedule);
+			}
+			System.out.println("Completed Writing Schedules to Dynamo :" + list.size());
 		} catch (Exception e) {
 			System.out.println("Exception: " + e);
 		}
