@@ -18,8 +18,8 @@ Resources:
         Fn::GetAtt:
         - DynamoLambdaRole
         - Arn 
-      Timeout: 300
-      MemorySize: 1024 
+      Timeout: 60
+      MemorySize: 512 
       VpcConfig:
         SecurityGroupIds:
           - !Ref FunctionSecurityGroupDynamoS3
