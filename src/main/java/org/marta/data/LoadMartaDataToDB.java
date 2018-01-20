@@ -103,9 +103,13 @@ public class LoadMartaDataToDB implements RequestHandler<S3Event, String> {
 			List<Stop> list = rowProcessor.getBeans();
 
 			System.out.println("Writing Stops to Dynamo :" + list.size());
-			stopRepository.saveOrUpdateStopw(list);
+			for (Stop stop : list) {
+				System.out.println("Writing Stop record Dynamo :" + stop.getStopId());
+				stopRepository.save(stop);
+			}
+			
 		} catch (Exception e) {
-			System.out.println("Exception: " + e);
+			System.out.println("Unable to write to dynamo Exception: " + e);
 		}
 	}
 

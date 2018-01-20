@@ -44,7 +44,7 @@ public class StopRepository extends DynamoDAO implements Repository<Stop> {
         mapper.save(stop);
     }
     
-    public void saveOrUpdateStopw(List<Stop> stops) {
+    public void saveOrUpdateStops(List<Stop> stops) {
         mapper.batchSave(stops);
     }
 }
